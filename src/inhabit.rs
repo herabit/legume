@@ -1,26 +1,16 @@
 use crate::array::{Length, NonEmpty};
 use core::{
     cell::{Cell, RefCell, UnsafeCell},
+    ffi::CStr,
     mem::{ManuallyDrop, MaybeUninit},
     num::NonZero,
     ops::ControlFlow,
     ptr::NonNull,
     sync::atomic,
     task::Poll,
-    ffi::CStr,
 };
 
 #[cfg(feature = "alloc")]
-use alloc::{
-    vec::Vec,
-    boxed::Box,
-    rc::Rc,
-    rc::{Weak as RcWeak},
-    sync::Arc,
-    string::String,
-    ffi::CString,
-}
-
 #[cfg(target_has_atomic = "8")]
 use atomic::{AtomicBool, AtomicI8, AtomicU8};
 
@@ -109,6 +99,29 @@ pub unsafe trait Inhabitability {
     type Output: Inhabit;
 }
 
+/// Marker trait that currently only indicates the [`Inhabitability`] of references.
+///
+/// This exists mostly to act as a stand-in for changing the inhabitability
+/// of references and reference-like types for when the exact details
+/// of whether they're inhabited is formalized.
+///
+/// Right now, it is not formalzied, so references of a type
+/// inherit the same inhabitability.
+pub unsafe trait InhabitabilityExt: Inhabitability {
+    /// The inhabitability of references to [`Self`].
+    type Ref: Inhabit;
+
+    /// The inhabitability of mutable references to [`Self`].
+    ///
+    /// It is unlikely this will ever differ from `Ref`.
+    type Mut: Inhabit;
+}
+
+unsafe impl<T: Inhabitability + ?Sized> InhabitabilityExt for T {
+    type Ref = T::Output;
+    type Mut = Self::Ref;
+}
+
 /// Marker trait that indicates that some type is inhabited.
 pub trait Inhabited: Inhabitability<Output = Always> {}
 
@@ -149,7 +162,7 @@ macro_rules! product {
     };
 
     ($ty:ty $(, $rest:ty)* $(,)?) => {
-        <<$ty as $crate::inhabit::Inhabitability>::Output as $crate::inhabit::Inhabit>::And<$crate::inhabit::sum!($($rest),*)>
+        <<$ty as $crate::inhabit::Inhabitability>::Output as $crate::inhabit::Inhabit>::And<$crate::inhabit::product!($($rest),*)>
     }
 }
 
@@ -163,7 +176,7 @@ macro_rules! sum {
     };
 
     ($ty:ty $(, $rest:ty)* $(,)?) => {
-        <<$ty as $crate::inhabit::Inhabitability>::Output as $crate::inhabit::Inhabit>::Or<$crate::inhabit::product!($($rest),*)>
+        <<$ty as $crate::inhabit::Inhabitability>::Output as $crate::inhabit::Inhabit>::Or<$crate::inhabit::sum!($($rest),*)>
     }
 }
 
@@ -276,14 +289,88 @@ unsafe impl<T: ?Sized> Inhabitability for NonNull<T> {
 // an instance of `T`, they're also always considered inhabited,
 // as they act more as `Option<T>` than `T`.
 unsafe impl<T: Inhabitability + ?Sized> Inhabitability for &T {
-    type Output = T::Output;
+    type Output = <T as InhabitabilityExt>::Ref;
 }
 
 unsafe impl<T: Inhabitability + ?Sized> Inhabitability for &mut T {
-    type Output = T::Output;
+    type Output = <T as InhabitabilityExt>::Mut;
 }
 
-// #[cfg(feature = "alloc")]
+#[cfg(feature = "alloc")]
+mod _alloc {
+    use super::*;
+
+    use alloc::{
+        borrow::{Cow, ToOwned},
+        boxed::Box,
+        collections::{BTreeMap, BTreeSet, BinaryHeap, LinkedList, VecDeque},
+        ffi::CString,
+        rc::{self, Rc},
+        string::String,
+        sync::{self, Arc},
+        vec::Vec,
+    };
+
+    unsafe impl<T> Inhabitability for Vec<T> {
+        type Output = Always;
+    }
+
+    unsafe impl<T> Inhabitability for VecDeque<T> {
+        type Output = Always;
+    }
+
+    unsafe impl<T> Inhabitability for BinaryHeap<T> {
+        type Output = Always;
+    }
+
+    unsafe impl<T> Inhabitability for LinkedList<T> {
+        type Output = Always;
+    }
+
+    unsafe impl<K, V> Inhabitability for BTreeMap<K, V> {
+        type Output = Always;
+    }
+
+    unsafe impl<T> Inhabitability for BTreeSet<T> {
+        type Output = Always;
+    }
+
+    unsafe impl<T: Inhabitability + ?Sized> Inhabitability for Box<T> {
+        type Output = <T as InhabitabilityExt>::Mut;
+    }
+
+    unsafe impl<T: Inhabitability + ?Sized> Inhabitability for Rc<T> {
+        type Output = <T as InhabitabilityExt>::Ref;
+    }
+
+    unsafe impl<T: ?Sized> Inhabitability for rc::Weak<T> {
+        type Output = Always;
+    }
+
+    unsafe impl<T: Inhabitability + ?Sized> Inhabitability for Arc<T> {
+        type Output = <T as InhabitabilityExt>::Ref;
+    }
+
+    unsafe impl<T: ?Sized> Inhabitability for sync::Weak<T> {
+        type Output = Always;
+    }
+
+    unsafe impl Inhabitability for String {
+        type Output = Always;
+    }
+
+    unsafe impl Inhabitability for CString {
+        type Output = Always;
+    }
+
+    unsafe impl<'a, B> Inhabitability for Cow<'a, B>
+    where
+        B: 'a + ToOwned + ?Sized + Inhabitability,
+        B::Owned: Inhabitability,
+    {
+        type Output = sum!(&'a B, B::Owned);
+    }
+}
 
 // Primitives besides `never` are always inhabited.
 inhabit!(u8, u16, u32, u64, u128, usize);
@@ -331,6 +418,8 @@ inhabit!(AtomicIsize, AtomicUsize);
 unsafe impl<T> Inhabitability for AtomicPtr<T> {
     type Output = Always;
 }
+
+inhabit!(CStr);
 
 // Interior mutability types are just wrappers around `T`, so they are
 // only inhabited if T is.

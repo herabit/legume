@@ -25,4 +25,4 @@ pub mod array;
 #[doc(inline)]
 pub use forget::Forget;
 #[doc(inline)]
-pub use inhabit::*;
+pub use inhabit::{Inhabited, Uninhabited};
