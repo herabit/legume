@@ -10,3 +10,4 @@ rust-version = "1.83"
 default = ["std"]
 std = ["alloc"]
 alloc = []
+nightly = []
