@@ -8,8 +8,23 @@ extern crate std;
 
 mod macros;
 mod util;
-mod zeroable_in_option;
 
-pub mod func;
+mod zeroable;
+pub use zeroable::*;
+
+mod zeroable_in_option;
+pub use zeroable_in_option::*;
+
+mod func;
+pub use func::*;
+
+mod no_uninit;
+pub use no_uninit::*;
+
+mod no_uninit_in_option;
+pub use no_uninit_in_option::*;
+
+/// Module for handling pointers.
 pub mod ptr;
-pub mod zeroable;
+#[doc(inline)]
+pub use ptr::{Pointee, Thin};

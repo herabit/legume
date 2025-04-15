@@ -1,25 +1,19 @@
 use crate::{ptr::Pointee, util};
-use core::{
-    cell::{Cell, UnsafeCell},
-    cmp::{Ordering, Reverse},
-    marker::{PhantomData, PhantomPinned},
-    mem::{ManuallyDrop, MaybeUninit},
-    num::{Saturating, Wrapping},
-};
 
-#[doc(inline)]
-pub use crate::zeroable_in_option::*;
-
+/// Create a new `T` filled with all zeroes.
 #[inline]
 #[must_use]
 pub const fn zeroed<T: Zeroable>() -> T {
     unsafe { core::mem::zeroed() }
 }
 
+/// Fill some `T` filled with all zeroes.
 #[inline]
 #[must_use]
-pub const fn write_zeroes<T: Zeroable + ?Sized>(dst: &mut T) {
+pub const fn fill_zeroes<T: Zeroable + ?Sized>(dst: &mut T) -> &mut T {
     unsafe { util::memset(dst, 0) }
+
+    dst
 }
 
 /// Trait for types that can be filled with all zeroes.
@@ -33,23 +27,23 @@ unsafe impl<T: Zeroable, const N: usize> Zeroable for [T; N] {}
 unsafe impl<T: Pointee<Metadata: Zeroable> + ?Sized> Zeroable for *const T {}
 unsafe impl<T: Pointee<Metadata: Zeroable> + ?Sized> Zeroable for *mut T {}
 
-unsafe impl<T: Zeroable> Zeroable for Saturating<T> {}
-unsafe impl<T: Zeroable> Zeroable for Wrapping<T> {}
+unsafe impl<T: Zeroable> Zeroable for core::num::Saturating<T> {}
+unsafe impl<T: Zeroable> Zeroable for core::num::Wrapping<T> {}
 
-unsafe impl<T: Zeroable> Zeroable for Reverse<T> {}
+unsafe impl<T: Zeroable> Zeroable for core::cmp::Reverse<T> {}
 
-unsafe impl<T: Zeroable + ?Sized> Zeroable for ManuallyDrop<T> {}
-unsafe impl<T> Zeroable for MaybeUninit<T> {}
+unsafe impl<T: Zeroable + ?Sized> Zeroable for core::mem::ManuallyDrop<T> {}
+unsafe impl<T> Zeroable for core::mem::MaybeUninit<T> {}
 
-unsafe impl<T: Zeroable + ?Sized> Zeroable for UnsafeCell<T> {}
-unsafe impl<T: Zeroable + ?Sized> Zeroable for Cell<T> {}
+unsafe impl<T: Zeroable + ?Sized> Zeroable for core::cell::UnsafeCell<T> {}
+unsafe impl<T: Zeroable + ?Sized> Zeroable for core::cell::Cell<T> {}
 
-unsafe impl<T: ?Sized> Zeroable for PhantomData<T> {}
+unsafe impl<T: ?Sized> Zeroable for core::marker::PhantomData<T> {}
 
 macro_rules! zeroable {
-    ($($prim:ident),*) => {
+    ($($ty:ty),*) => {
         $(
-            unsafe impl Zeroable for $prim {}
+            unsafe impl Zeroable for $ty {}
         )*
     };
 }
@@ -60,8 +54,8 @@ zeroable!(f32, f64);
 zeroable!(bool);
 zeroable!(char);
 zeroable!(str);
-zeroable!(Ordering);
-zeroable!(PhantomPinned);
+zeroable!(core::cmp::Ordering);
+zeroable!(core::marker::PhantomPinned);
 
 macro_rules! zeroable_tuple {
     (
@@ -98,3 +92,26 @@ zeroable_tuple!(
     (T0: (+ ?Sized)),
     (),
 );
+
+/// Trait that is automatically implemented for all [`Zeroable`] types,
+/// providing some
+pub trait ZeroableExt: Zeroable {
+    /// Calls [`zeroed`].
+    #[inline]
+    #[must_use]
+    fn zeroed() -> Self
+    where
+        Self: Sized,
+    {
+        zeroed()
+    }
+
+    /// Calls [`fill_zeroes`].
+    #[inline]
+    #[must_use]
+    fn fill_zeroes(&mut self) -> &mut Self {
+        fill_zeroes(self)
+    }
+}
+
+impl<T: Zeroable + ?Sized> ZeroableExt for T {}
