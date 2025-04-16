@@ -1,7 +1,13 @@
 [package]
 name = "legume"
-version = "0.1.0"
+authors = ["Hera Chamorro <hera@hera.wtf>"]
+version = "0.0.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Peas in a pod, reinterpreting bits like a god."
+homepage = "https://github.com/herabit/legume"
+repository = "https://github.com/herabit/legume"
+readme = "README.md"
 
 [dependencies]
 
