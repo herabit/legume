@@ -5,7 +5,7 @@ use core::{
     ptr::{self, NonNull},
 };
 
-use crate::NoUninit;
+use crate::{Freeze, NoUninit};
 
 /// Enum that determines whether the pointer metadata for a given type is
 /// stored before, or after the address.
@@ -52,7 +52,7 @@ impl MetadataPosition {
 /// Implementors must ensure that pointers to [`Self`] contain ***absolutely no uninitialized bytes***.
 pub unsafe trait Pointee {
     /// The pointer metadata.
-    type Metadata: fmt::Debug + Copy + Send + Sync + Ord + hash::Hash + Unpin + NoUninit;
+    type Metadata: fmt::Debug + Copy + Send + Sync + Ord + hash::Hash + Unpin + NoUninit + Freeze;
 
     /// Where the metadata is stored within a pointer to `Self` relative to the address.
     const METADATA_POSITION: MetadataPosition;

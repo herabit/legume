@@ -1,4 +1,4 @@
-use crate::{ptr::Pointee, util};
+use crate::{macros::impl_for_atomic, ptr::Pointee, util};
 
 /// Create a new `T` filled with all zeroes.
 #[inline]
@@ -92,6 +92,8 @@ zeroable_tuple!(
     (T0: (+ ?Sized)),
     (),
 );
+
+impl_for_atomic!(unsafe impl Zeroable);
 
 /// Trait that is automatically implemented for all [`Zeroable`] types,
 /// providing some
