@@ -1,5 +1,8 @@
 use crate::{macros::impl_for_atomic, Pointee};
 
+// #[doc(inline)]
+// pub use crate::no_uninit_in_option::*;
+
 /// Trait for types that contain no uninitialized bytes.
 ///
 /// This trait makes no guarantees about whether these bytes can be safely accessed,
